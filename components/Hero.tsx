@@ -1,15 +1,56 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import LoginModal from './LoginModal';
+import { isAuthenticated, getUser, setUser } from '@/lib/auth';
 
 export default function Hero() {
   const router = useRouter();
   const [inputValue, setInputValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+
+  useEffect(() => {
+    // Check authentication status on mount
+    setIsLoggedIn(isAuthenticated());
+  }, []);
+
+  const handleLogin = (email: string) => {
+    setUser({ email });
+    setIsLoggedIn(true);
+    setShowLoginModal(false);
+    setShowLoginPrompt(false);
+  };
+
+  const handleInputFocus = () => {
+    if (!isLoggedIn) {
+      setShowLoginPrompt(true);
+      setIsFocused(false);
+      setTimeout(() => setShowLoginModal(true), 300);
+    } else {
+      setIsFocused(true);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isLoggedIn) {
+      setShowLoginPrompt(true);
+      setShowLoginModal(true);
+      return;
+    }
+    setInputValue(e.target.value);
+  };
 
   const handleStartBuilding = () => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+
     if (inputValue.trim()) {
       // Navigate to chat with the input as initial message
       router.push(`/chat?message=${encodeURIComponent(inputValue.trim())}`);
@@ -65,27 +106,43 @@ export default function Hero() {
         >
           <div
             className={`relative max-w-2xl mx-auto transition-all duration-300 ${
-              isFocused
+              isFocused && isLoggedIn
                 ? 'ring-2 ring-purple-500/50 shadow-2xl shadow-purple-500/20'
+                : showLoginPrompt
+                ? 'ring-2 ring-yellow-500/50 shadow-2xl shadow-yellow-500/20'
                 : 'ring-1 ring-gray-800'
             }`}
           >
             <input
               type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              value={isLoggedIn ? inputValue : ''}
+              onChange={handleInputChange}
               onKeyPress={handleKeyPress}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              placeholder="Describe what you want to build..."
-              className="w-full px-6 py-5 sm:px-8 sm:py-6 bg-gray-900/50 border border-gray-800 rounded-2xl text-white placeholder-gray-500 text-lg sm:text-xl focus:outline-none backdrop-blur-sm"
+              onFocus={handleInputFocus}
+              onBlur={() => {
+                setIsFocused(false);
+                setTimeout(() => setShowLoginPrompt(false), 200);
+              }}
+              placeholder={isLoggedIn ? "Describe what you want to build..." : "Login to continue..."}
+              className="w-full px-6 py-5 sm:px-8 sm:py-6 bg-gray-900/50 border border-gray-800 rounded-2xl text-white placeholder-gray-500 text-lg sm:text-xl focus:outline-none backdrop-blur-sm cursor-pointer"
+              readOnly={!isLoggedIn}
             />
-            {isFocused && (
+            {isFocused && isLoggedIn && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="absolute inset-0 rounded-2xl bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-orange-500/10 pointer-events-none"
               />
+            )}
+            {showLoginPrompt && !isLoggedIn && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-yellow-500/90 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shadow-lg"
+              >
+                Please login to continue
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-yellow-500/90" />
+              </motion.div>
             )}
           </div>
         </motion.div>
@@ -121,9 +178,31 @@ export default function Hero() {
           transition={{ delay: 0.6, duration: 0.6 }}
           className="mt-8 text-sm text-gray-500"
         >
-          Press Enter to start
+          {isLoggedIn ? 'Press Enter to start' : 'Sign in to start building'}
         </motion.p>
+
+        {/* User info if logged in */}
+        {isLoggedIn && getUser() && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-400"
+          >
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span>Signed in as {getUser()?.email}</span>
+          </motion.div>
+        )}
       </motion.div>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => {
+          setShowLoginModal(false);
+          setShowLoginPrompt(false);
+        }}
+        onLogin={handleLogin}
+      />
     </div>
   );
 }

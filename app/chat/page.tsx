@@ -2,13 +2,16 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import ChatHeader from '@/components/ChatHeader';
 import ChatMessage from '@/components/ChatMessage';
 import ChatInput from '@/components/ChatInput';
+import LoginModal from '@/components/LoginModal';
 import { Message } from '@/lib/gemini';
+import { isAuthenticated, getUser, setUser } from '@/lib/auth';
 
 export default function ChatPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialMessage = searchParams.get('message');
   const hasSentInitial = useRef(false);
@@ -20,7 +23,24 @@ export default function ChatPage() {
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Check authentication on mount
+    const authenticated = isAuthenticated();
+    setIsLoggedIn(authenticated);
+    if (!authenticated) {
+      setShowLoginModal(true);
+    }
+  }, []);
+
+  const handleLogin = (email: string) => {
+    setUser({ email });
+    setIsLoggedIn(true);
+    setShowLoginModal(false);
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -31,6 +51,11 @@ export default function ChatPage() {
   }, [messages]);
 
   const handleSend = async (content: string) => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+
     // Add user message immediately
     const userMessage: Message = { role: 'user', content };
     const updatedMessages = [...messages, userMessage];
@@ -167,7 +192,58 @@ export default function ChatPage() {
         </div>
       </main>
 
-      <ChatInput onSend={handleSend} disabled={isLoading} />
+      {!isLoggedIn && (
+        <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-40">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-800 border border-gray-700 rounded-2xl p-8 max-w-md mx-4 text-center"
+          >
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mx-auto mb-4">
+              <svg
+                className="w-8 h-8 text-purple-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Login Required</h3>
+            <p className="text-gray-400 mb-6">
+              Please sign in to access the chat interface
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowLoginModal(true)}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl"
+            >
+              Sign In
+            </motion.button>
+          </motion.div>
+        </div>
+      )}
+
+      <ChatInput onSend={handleSend} disabled={isLoading || !isLoggedIn} />
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => {
+          if (!isLoggedIn) {
+            router.push('/');
+          } else {
+            setShowLoginModal(false);
+          }
+        }}
+        onLogin={handleLogin}
+      />
     </div>
   );
 }

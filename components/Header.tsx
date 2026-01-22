@@ -1,9 +1,28 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { isAuthenticated, getUser, removeUser } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 
 export default function Header() {
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<{ email: string } | null>(null);
+
+  useEffect(() => {
+    setIsLoggedIn(isAuthenticated());
+    setUser(getUser());
+  }, []);
+
+  const handleLogout = () => {
+    removeUser();
+    setIsLoggedIn(false);
+    setUser(null);
+    router.push('/');
+  };
+
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -22,13 +41,29 @@ export default function Header() {
             <span className="text-lg font-semibold text-white">Lovable AI</span>
           </Link>
           
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="flex items-center gap-4">
+            {isLoggedIn && user && (
+              <div className="hidden md:flex items-center gap-3 text-sm">
+                <div className="flex items-center gap-2 text-gray-400">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  <span>{user.email}</span>
+                </div>
+              </div>
+            )}
             <Link
               href="/chat"
               className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               Chat
             </Link>
+            {isLoggedIn && (
+              <button
+                onClick={handleLogout}
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Logout
+              </button>
+            )}
           </nav>
         </div>
       </div>
