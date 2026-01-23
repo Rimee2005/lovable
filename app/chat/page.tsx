@@ -8,7 +8,7 @@ import ChatMessage from '@/components/ChatMessage';
 import ChatInput from '@/components/ChatInput';
 import LoginModal from '@/components/LoginModal';
 import { Message } from '@/lib/gemini';
-import { isAuthenticated, getUser, setUser } from '@/lib/auth';
+import { isAuthenticated, getUser, setAuth, verifyAuth } from '@/lib/auth';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -28,18 +28,23 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Check authentication on mount
-    const authenticated = isAuthenticated();
-    setIsLoggedIn(authenticated);
-    if (!authenticated) {
-      setShowLoginModal(true);
-    }
+    // Verify authentication on mount
+    const checkAuth = async () => {
+      const user = await verifyAuth();
+      if (user) {
+        setIsLoggedIn(true);
+      } else {
+        setShowLoginModal(true);
+      }
+    };
+    checkAuth();
   }, []);
 
-  const handleLogin = (email: string) => {
-    setUser({ email });
+  const handleLogin = (user: { id: string; email: string; name?: string }) => {
     setIsLoggedIn(true);
     setShowLoginModal(false);
+    // Refresh to update auth state
+    window.location.reload();
   };
 
   const scrollToBottom = () => {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { isAuthenticated, getUser, removeUser } from '@/lib/auth';
+import { isAuthenticated, getUser, removeAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 export default function Header() {
@@ -17,7 +17,7 @@ export default function Header() {
   }, []);
 
   const handleLogout = () => {
-    removeUser();
+    removeAuth();
     setIsLoggedIn(false);
     setUser(null);
     router.push('/');

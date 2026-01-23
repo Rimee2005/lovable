@@ -1,22 +1,31 @@
-// Simple authentication utilities
-// In production, replace with real authentication (NextAuth, Auth0, etc.)
+// Authentication utilities with JWT tokens
 
 export interface User {
+  id: string;
   email: string;
   name?: string;
 }
 
-const AUTH_KEY = 'lovable_user';
+const TOKEN_KEY = 'lovable_token';
+const USER_KEY = 'lovable_user';
 
-export function setUser(user: User) {
+export function setAuth(token: string, user: User) {
   if (typeof window !== 'undefined') {
-    sessionStorage.setItem(AUTH_KEY, JSON.stringify(user));
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
   }
+}
+
+export function getToken(): string | null {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(TOKEN_KEY);
+  }
+  return null;
 }
 
 export function getUser(): User | null {
   if (typeof window !== 'undefined') {
-    const userStr = sessionStorage.getItem(AUTH_KEY);
+    const userStr = localStorage.getItem(USER_KEY);
     if (userStr) {
       try {
         return JSON.parse(userStr);
@@ -28,13 +37,40 @@ export function getUser(): User | null {
   return null;
 }
 
-export function removeUser() {
+export function removeAuth() {
   if (typeof window !== 'undefined') {
-    sessionStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
   }
 }
 
 export function isAuthenticated(): boolean {
-  return getUser() !== null;
+  return getToken() !== null && getUser() !== null;
+}
+
+export async function verifyAuth(): Promise<User | null> {
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch('/api/auth/me', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      setAuth(token, data.user);
+      return data.user;
+    } else {
+      removeAuth();
+      return null;
+    }
+  } catch (error) {
+    console.error('Auth verification error:', error);
+    removeAuth();
+    return null;
+  }
 }
 
