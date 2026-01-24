@@ -5,6 +5,9 @@ import User from '@/models/User';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
+// Mark route as dynamic
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.headers.get('authorization')?.replace('Bearer ', '');

@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 
+// Mark route as dynamic
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -47,10 +50,14 @@ export async function POST(request: NextRequest) {
       name: name || '',
     });
 
+    // Get database name from mongoose connection
+    const mongoose = await import('mongoose');
+    const dbName = mongoose.default.connection.db?.databaseName || 'unknown';
+    
     console.log('✅ User created successfully:', {
       id: user._id,
       email: user.email,
-      database: user.db?.databaseName || 'unknown'
+      database: dbName
     });
 
     // Return user data (without password)

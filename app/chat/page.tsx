@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ChatHeader from '@/components/ChatHeader';
@@ -10,7 +10,7 @@ import LoginModal from '@/components/LoginModal';
 import { Message } from '@/lib/gemini';
 import { isAuthenticated, getUser, setAuth, verifyAuth } from '@/lib/auth';
 
-export default function ChatPage() {
+function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialMessage = searchParams.get('message');
@@ -250,6 +250,18 @@ export default function ChatPage() {
         onLogin={handleLogin}
       />
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-950">
+        <div className="text-white">Loading...</div>
+      </div>
+    }>
+      <ChatContent />
+    </Suspense>
   );
 }
 

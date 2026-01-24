@@ -135,10 +135,13 @@ export async function generateAIResponse(messages: Message[]): Promise<string> {
         role: 'model' as const,
         parts: [{ text: 'Understood. I\'m ready to help you design UI, generate code, and refine product ideas.' }],
       },
-      ...historyMessages.map((msg) => ({
-        role: (msg.role === 'user' ? 'user' : 'model') as const,
-        parts: [{ text: msg.content }],
-      })),
+      ...historyMessages.map((msg) => {
+        const role: 'user' | 'model' = msg.role === 'user' ? 'user' : 'model';
+        return {
+          role: role,
+          parts: [{ text: msg.content }],
+        };
+      }),
     ];
   }
 

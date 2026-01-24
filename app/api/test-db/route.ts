@@ -3,6 +3,9 @@ import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import mongoose from 'mongoose';
 
+// Mark route as dynamic
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     // Test connection
