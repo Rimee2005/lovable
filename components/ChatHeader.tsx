@@ -9,7 +9,7 @@ import { isAuthenticated, getUser, removeAuth } from '@/lib/auth';
 export default function ChatHeader() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState<{ email: string } | null>(null);
+  const [user, setUser] = useState<{ email: string; name?: string } | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   useEffect(() => {
