@@ -8,7 +8,22 @@ import ChatMessage from '@/components/ChatMessage';
 import ChatInput from '@/components/ChatInput';
 import LoginModal from '@/components/LoginModal';
 import { Message } from '@/lib/gemini';
-import { isAuthenticated, getUser, setAuth, verifyAuth } from '@/lib/auth';
+import { isAuthenticated } from '@/lib/auth';
+
+const DEFAULT_GREETING =
+  "Hello! I'm Lovable AI. How can I help you design and build something amazing today?";
+
+const GREETING_VARIANTS: string[] = [
+  DEFAULT_GREETING,
+  'Tell me what you want to build and I will sketch the UI and code for you.',
+  'Describe your product idea and I will turn it into clean React/Next.js components.',
+  'What are we designing today – a dashboard, landing page, or full app?',
+  'Share a rough idea and I will help refine the UX and generate production-ready code.',
+];
+
+function getRandomGreeting() {
+  return GREETING_VARIANTS[Math.floor(Math.random() * GREETING_VARIANTS.length)];
+}
 
 function ChatContent() {
   const router = useRouter();
@@ -19,7 +34,7 @@ function ChatContent() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'ai',
-      content: "Hello! I'm Lovable AI. How can I help you design and build something amazing today?",
+      content: DEFAULT_GREETING,
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,23 +43,33 @@ function ChatContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Verify authentication on mount
-    const checkAuth = async () => {
-      const user = await verifyAuth();
-      if (user) {
-        setIsLoggedIn(true);
-      } else {
-        setShowLoginModal(true);
-      }
-    };
-    checkAuth();
+    // Check auth state from local storage on mount
+    const authed = isAuthenticated();
+    setIsLoggedIn(authed);
+    if (!authed) {
+      setShowLoginModal(true);
+    }
+
+    // After hydration, optionally randomize the initial greeting on the client only
+    const randomGreeting = getRandomGreeting();
+    if (randomGreeting !== DEFAULT_GREETING) {
+      setMessages((prev) => {
+        if (prev.length === 1 && prev[0].role === 'ai') {
+          return [
+            {
+              ...prev[0],
+              content: randomGreeting,
+            },
+          ];
+        }
+        return prev;
+      });
+    }
   }, []);
 
   const handleLogin = (user: { id: string; email: string; name?: string }) => {
     setIsLoggedIn(true);
     setShowLoginModal(false);
-    // Refresh to update auth state
-    window.location.reload();
   };
 
   const scrollToBottom = () => {
@@ -66,6 +91,19 @@ function ChatContent() {
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setIsLoading(true);
+
+    // Failsafe timeout so loader doesn't spin forever
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'ai',
+          content:
+            'The AI is taking longer than expected. Please check your connection or try again in a moment.',
+        },
+      ]);
+    }, 45000);
 
     try {
       const response = await fetch('/api/chat', {
@@ -95,10 +133,13 @@ function ChatContent() {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         role: 'ai',
-        content: error.message || 'Sorry, I encountered an error. Please make sure your GEMINI_API_KEY is set in .env.local and try again.',
+        content:
+          error.message ||
+          'Sorry, I encountered an error. Please make sure your GEMINI_API_KEY is set in .env.local and try again.',
       };
       setMessages([...updatedMessages, errorMessage]);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };

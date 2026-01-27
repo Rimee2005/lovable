@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import LoginModal from './LoginModal';
-import { isAuthenticated, getUser, verifyAuth } from '@/lib/auth';
+import { isAuthenticated, getUser } from '@/lib/auth';
 
 export default function Hero() {
   const router = useRouter();
@@ -15,20 +15,14 @@ export default function Hero() {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   useEffect(() => {
-    // Verify authentication status on mount
-    const checkAuth = async () => {
-      const user = await verifyAuth();
-      setIsLoggedIn(!!user);
-    };
-    checkAuth();
+    // Check authentication status from local storage on mount
+    setIsLoggedIn(isAuthenticated());
   }, []);
 
   const handleLogin = (user: { id: string; email: string; name?: string }) => {
     setIsLoggedIn(true);
     setShowLoginModal(false);
     setShowLoginPrompt(false);
-    // Refresh page to update auth state
-    window.location.reload();
   };
 
   const handleInputFocus = () => {
