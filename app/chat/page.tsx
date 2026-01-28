@@ -8,7 +8,7 @@ import ChatMessage from '@/components/ChatMessage';
 import ChatInput from '@/components/ChatInput';
 import LoginModal from '@/components/LoginModal';
 import { Message } from '@/lib/gemini';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, getToken } from '@/lib/auth';
 
 const DEFAULT_GREETING =
   "Hello! I'm Lovable AI. How can I help you design and build something amazing today?";
@@ -19,6 +19,29 @@ const GREETING_VARIANTS: string[] = [
   'Describe your product idea and I will turn it into clean React/Next.js components.',
   'What are we designing today – a dashboard, landing page, or full app?',
   'Share a rough idea and I will help refine the UX and generate production-ready code.',
+];
+
+const PROMPT_SUGGESTIONS: { title: string; prompt: string }[] = [
+  {
+    title: 'Build a Portfolio',
+    prompt:
+      'Build a clean personal portfolio website with sections for hero, projects grid, about, and contact form. Use modern UI patterns and responsive layout.',
+  },
+  {
+    title: 'Create a Landing Page',
+    prompt:
+      'Create a beautiful SaaS landing page with a hero section, features grid, pricing table, testimonials, and call-to-action sections. Make it conversion-focused.',
+  },
+  {
+    title: 'Build a Dashboard',
+    prompt:
+      'Design an admin dashboard with sidebar navigation, stats cards, charts area, and a recent activity table. Focus on clarity and usability.',
+  },
+  {
+    title: 'Design a Product Page',
+    prompt:
+      'Design a product detail page with gallery, description, specs, reviews, and add-to-cart section. Make it feel premium and easy to scan.',
+  },
 ];
 
 function getRandomGreeting() {
@@ -43,28 +66,50 @@ function ChatContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Check auth state from local storage on mount
-    const authed = isAuthenticated();
-    setIsLoggedIn(authed);
-    if (!authed) {
-      setShowLoginModal(true);
-    }
+    const init = async () => {
+      const authed = isAuthenticated();
+      setIsLoggedIn(authed);
+      if (!authed) {
+        setShowLoginModal(true);
+      }
 
-    // After hydration, optionally randomize the initial greeting on the client only
-    const randomGreeting = getRandomGreeting();
-    if (randomGreeting !== DEFAULT_GREETING) {
-      setMessages((prev) => {
-        if (prev.length === 1 && prev[0].role === 'ai') {
-          return [
-            {
-              ...prev[0],
-              content: randomGreeting,
-            },
-          ];
+      // Try to load previous conversation if authenticated
+      try {
+        const token = getToken();
+        if (token) {
+          const res = await fetch('/api/chat/history', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+              setMessages(data.messages);
+              return;
+            }
+          }
         }
-        return prev;
-      });
-    }
+      } catch (historyError) {
+        console.warn('Failed to load chat history', historyError);
+      }
+
+      // After hydration, randomize the initial greeting on the client only
+      const randomGreeting = getRandomGreeting();
+      if (randomGreeting !== DEFAULT_GREETING) {
+        setMessages((prev) => {
+          if (prev.length === 1 && prev[0].role === 'ai') {
+            return [
+              {
+                ...prev[0],
+                content: randomGreeting,
+              },
+            ];
+          }
+          return prev;
+        });
+      }
+    };
+
+    init();
   }, []);
 
   const handleLogin = (user: { id: string; email: string; name?: string }) => {
@@ -106,11 +151,17 @@ function ChatContent() {
     }, 45000);
 
     try {
+      const token = getToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ messages: updatedMessages }),
       });
 
