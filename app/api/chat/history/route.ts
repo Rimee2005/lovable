@@ -43,9 +43,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ messages }, { status: 200 });
   } catch (error: any) {
     console.error('Chat history error:', error);
+    // In case of any error, don't block the UI; just return empty history
     return NextResponse.json(
       { messages: [], error: error.message || 'Failed to load history' },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }

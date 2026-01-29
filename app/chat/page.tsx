@@ -212,7 +212,29 @@ function ChatContent() {
         {/* Subtle background pattern */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.1),transparent_50%)] pointer-events-none" />
         
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 relative">
+        {/* Prompt suggestions row */}
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 pt-6 pb-2">
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {PROMPT_SUGGESTIONS.map((item) => (
+              <button
+                key={item.title}
+                type="button"
+                onClick={() => {
+                  if (!isLoggedIn) {
+                    setShowLoginModal(true);
+                    return;
+                  }
+                  handleSend(item.prompt);
+                }}
+                className="whitespace-nowrap px-4 py-2 rounded-full border border-gray-700/70 bg-gray-900/80 text-sm text-gray-100 hover:border-purple-500 hover:bg-gray-800/90 transition-colors"
+              >
+                {item.title}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 relative">
           {messages.length === 1 && messages[0].role === 'ai' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
