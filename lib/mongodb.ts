@@ -30,6 +30,12 @@ async function connectDB() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      // Avoid 30s hangs when Atlas is temporarily unreachable (your logs show TLS/SSL selection issues)
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      // Some networks have IPv6/TLS quirks; prefer IPv4
+      family: 4,
     };
 
     console.log('🔄 Connecting to MongoDB...');

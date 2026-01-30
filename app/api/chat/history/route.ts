@@ -29,7 +29,13 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
-    const conversation = await Conversation.findOne({ user: userId }).lean();
+    // Use timeout to fail fast if MongoDB is slow
+    const conversationPromise = Conversation.findOne({ user: userId }).lean();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Database query timeout')), 5000)
+    );
+
+    const conversation = await Promise.race([conversationPromise, timeoutPromise]) as any;
 
     if (!conversation || !conversation.messages || conversation.messages.length === 0) {
       return NextResponse.json({ messages: [] }, { status: 200 });

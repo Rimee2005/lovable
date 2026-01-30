@@ -54,18 +54,21 @@ function ChatContent() {
   const initialMessage = searchParams.get('message');
   const hasSentInitial = useRef(false);
   
+  // Always start with default greeting to avoid hydration mismatch
+  // Load from localStorage only after hydration (in useEffect)
   const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'ai',
-      content: DEFAULT_GREETING,
-    },
+    { role: 'ai', content: DEFAULT_GREETING },
   ]);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Mark as hydrated (client-side only)
+    setIsHydrated(true);
+
     const init = async () => {
       const authed = isAuthenticated();
       setIsLoggedIn(authed);
@@ -73,39 +76,62 @@ function ChatContent() {
         setShowLoginModal(true);
       }
 
-      // Try to load previous conversation if authenticated
+      // Load from localStorage first (fast, works offline)
+      let storedMessages: Message[] | null = null;
+      try {
+        const stored = localStorage.getItem('lovable_chat_messages');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            storedMessages = parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load messages from localStorage', e);
+      }
+
+      // If we have stored messages, use them immediately
+      if (storedMessages && (storedMessages.length > 1 || (storedMessages.length === 1 && storedMessages[0].role === 'user'))) {
+        setMessages(storedMessages);
+      }
+
+      // Then try API (slower, but syncs with server)
       try {
         const token = getToken();
         if (token) {
+          // Use AbortController for 5s timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          
           const res = await fetch('/api/chat/history', {
             headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
           });
+          clearTimeout(timeoutId);
+          
           if (res.ok) {
             const data = await res.json();
             if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
               setMessages(data.messages);
+              // Save to localStorage for next time
+              localStorage.setItem('lovable_chat_messages', JSON.stringify(data.messages));
               return;
             }
           }
         }
-      } catch (historyError) {
-        console.warn('Failed to load chat history', historyError);
+      } catch (historyError: any) {
+        // If API fails, keep using localStorage (already set above)
+        if (historyError.name !== 'AbortError') {
+          console.warn('Failed to load chat history from API, using localStorage', historyError);
+        }
       }
 
-      // After hydration, randomize the initial greeting on the client only
-      const randomGreeting = getRandomGreeting();
-      if (randomGreeting !== DEFAULT_GREETING) {
-        setMessages((prev) => {
-          if (prev.length === 1 && prev[0].role === 'ai') {
-            return [
-              {
-                ...prev[0],
-                content: randomGreeting,
-              },
-            ];
-          }
-          return prev;
-        });
+      // If no stored messages and no API messages, randomize the greeting
+      if (!storedMessages) {
+        const randomGreeting = getRandomGreeting();
+        if (randomGreeting !== DEFAULT_GREETING) {
+          setMessages([{ role: 'ai', content: randomGreeting }]);
+        }
       }
     };
 
@@ -179,7 +205,12 @@ function ChatContent() {
 
       const data = await response.json();
       const aiMessage: Message = { role: 'ai', content: data.message };
-      setMessages([...updatedMessages, aiMessage]);
+      const finalMessages = [...updatedMessages, aiMessage];
+      setMessages(finalMessages);
+      // Save to localStorage for persistence
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lovable_chat_messages', JSON.stringify(finalMessages));
+      }
     } catch (error: any) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
@@ -188,7 +219,12 @@ function ChatContent() {
           error.message ||
           'Sorry, I encountered an error. Please make sure your GEMINI_API_KEY is set in .env.local and try again.',
       };
-      setMessages([...updatedMessages, errorMessage]);
+      const finalMessages = [...updatedMessages, errorMessage];
+      setMessages(finalMessages);
+      // Save to localStorage even on error
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lovable_chat_messages', JSON.stringify(finalMessages));
+      }
     } finally {
       clearTimeout(timeoutId);
       setIsLoading(false);
@@ -211,28 +247,6 @@ function ChatContent() {
       <main className="flex-1 overflow-y-auto relative">
         {/* Subtle background pattern */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.1),transparent_50%)] pointer-events-none" />
-        
-        {/* Prompt suggestions row */}
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 pt-6 pb-2">
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {PROMPT_SUGGESTIONS.map((item) => (
-              <button
-                key={item.title}
-                type="button"
-                onClick={() => {
-                  if (!isLoggedIn) {
-                    setShowLoginModal(true);
-                    return;
-                  }
-                  handleSend(item.prompt);
-                }}
-                className="whitespace-nowrap px-4 py-2 rounded-full border border-gray-700/70 bg-gray-900/80 text-sm text-gray-100 hover:border-purple-500 hover:bg-gray-800/90 transition-colors"
-              >
-                {item.title}
-              </button>
-            ))}
-          </div>
-        </div>
 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 relative">
           {messages.length === 1 && messages[0].role === 'ai' && (
@@ -346,6 +360,26 @@ function ChatContent() {
               Sign In
             </motion.button>
           </motion.div>
+        </div>
+      )}
+
+      {/* Prompt suggestions above input - only show after hydration */}
+      {isHydrated && isLoggedIn && (
+        <div className="sticky bottom-[120px] max-w-4xl mx-auto px-4 sm:px-6 pb-2 z-10">
+          <div className="flex gap-3 overflow-x-auto">
+            {PROMPT_SUGGESTIONS.map((item) => (
+              <motion.button
+                key={item.title}
+                type="button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleSend(item.prompt)}
+                className="whitespace-nowrap px-4 py-2 rounded-full border border-gray-700/70 bg-gray-900/90 backdrop-blur-sm text-sm text-gray-100 hover:border-purple-500 hover:bg-gray-800/90 transition-colors"
+              >
+                {item.title}
+              </motion.button>
+            ))}
+          </div>
         </div>
       )}
 
