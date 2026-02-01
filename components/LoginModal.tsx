@@ -37,14 +37,19 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
 
     try {
       if (isRegisterMode) {
-        // Register
+        // Register with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s client timeout
+        
         const response = await fetch('/api/auth/register', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ email, password, name: name.trim() || undefined }),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
         const data = await response.json();
 
@@ -52,14 +57,19 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
           throw new Error(data.error || 'Registration failed');
         }
 
-        // After registration, automatically log in
+        // After registration, automatically log in with timeout
+        const loginController = new AbortController();
+        const loginTimeoutId = setTimeout(() => loginController.abort(), 15000);
+        
         const loginResponse = await fetch('/api/auth/login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ email, password }),
+          signal: loginController.signal,
         });
+        clearTimeout(loginTimeoutId);
 
         const loginData = await loginResponse.json();
 
@@ -71,14 +81,19 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
         setAuth(loginData.token, loginData.user);
         onLogin(loginData.user);
       } else {
-        // Login
+        // Login with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s client timeout
+        
         const response = await fetch('/api/auth/login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ email, password }),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
         const data = await response.json();
 
@@ -97,7 +112,11 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
       setName('');
       setIsRegisterMode(false);
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      if (err.name === 'AbortError') {
+        setError('Request timed out. The database may be temporarily unavailable. Please try again in a moment.');
+      } else {
+        setError(err.message || 'An error occurred. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
