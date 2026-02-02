@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import connectDB from '@/lib/mongodb';
+import connectDB, { resetConnection } from '@/lib/mongodb';
 import User from '@/models/User';
 
 // Mark route as dynamic
@@ -57,8 +57,19 @@ export async function POST(request: NextRequest) {
       existingUser = await Promise.race([findPromise, timeoutPromise]);
     } catch (queryError: any) {
       console.error('Database query error:', queryError);
+      // Reset connection if query fails - it might be stale
+      try {
+        await resetConnection();
+        console.warn('Resetting MongoDB connection due to query failure');
+      } catch {
+        // Ignore reset errors
+      }
       return NextResponse.json(
-        { error: 'Database query failed. Please try again.' },
+        { 
+          error: queryError.message?.includes('timeout') 
+            ? 'Database is taking too long to respond. Please try again in a moment.'
+            : 'Database query failed. Please try again.'
+        },
         { status: 503 }
       );
     }
@@ -87,8 +98,19 @@ export async function POST(request: NextRequest) {
       user = await Promise.race([createPromise, timeoutPromise]);
     } catch (createError: any) {
       console.error('User creation error:', createError);
+      // Reset connection if creation fails - it might be stale
+      try {
+        await resetConnection();
+        console.warn('Resetting MongoDB connection due to creation failure');
+      } catch {
+        // Ignore reset errors
+      }
       return NextResponse.json(
-        { error: 'Failed to create user. Please try again.' },
+        { 
+          error: createError.message?.includes('timeout') 
+            ? 'Database is taking too long to respond. Please try again in a moment.'
+            : 'Failed to create user. Please try again.'
+        },
         { status: 503 }
       );
     }

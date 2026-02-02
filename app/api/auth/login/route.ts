@@ -53,12 +53,8 @@ export async function POST(request: NextRequest) {
       console.error('Database query error:', queryError);
       // Reset connection if query fails - it might be stale
       try {
-        const mongoose = await import('mongoose');
-        if (mongoose.default.connection.readyState !== 0) {
-          console.warn('Resetting MongoDB connection due to query failure');
-          cached.conn = null;
-          cached.promise = null;
-        }
+        await resetConnection();
+        console.warn('Resetting MongoDB connection due to query failure');
       } catch {
         // Ignore reset errors
       }
