@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user with timeout
-    let user;
+    let user: any;
     try {
       const findPromise = User.findOne({ email: email.toLowerCase() });
       const timeoutPromise = new Promise((_, reject) =>
