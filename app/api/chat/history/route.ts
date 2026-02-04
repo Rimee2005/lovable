@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ messages: [] }, { status: 200 });
     }
 
-    const messages = conversation.messages.map((m) => ({
+    const messages = conversation.messages.map((m: any) => ({
       role: m.role,
       content: m.content,
     }));

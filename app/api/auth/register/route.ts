@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user with timeout
-    let user;
+    let user: any;
     try {
       const createPromise = User.create({
         email: email.toLowerCase(),
